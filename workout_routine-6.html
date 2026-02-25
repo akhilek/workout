@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Strength Builder</title>
+
+<!-- PWA / iOS App Meta Tags -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Strength">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d0d0d">
+<link rel="manifest" href="manifest.json">
+
+<!-- iOS Home Screen Icon (inline SVG as data URI) -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%230d0d0d'/><text x='90' y='125' text-anchor='middle' font-size='95'>💪</text></svg>">
+
+<!-- iOS Splash Screen -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --card: #1e1e1e;
+    --accent: #e8ff47;
+    --accent2: #ff6b35;
+    --text: #f0f0f0;
+    --muted: #888;
+    --border: #2a2a2a;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    height: 100%; width: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── APP SHELL ── */
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+    overflow: hidden;
+  }
+
+  /* ── SPLASH SCREEN ── */
+  #splash {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 20px; z-index: 999;
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  #splash.hide { opacity: 0; transform: scale(1.05); pointer-events: none; }
+  .splash-icon { font-size: 80px; animation: splashPulse 1.2s ease-in-out infinite; }
+  @keyframes splashPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+  .splash-title { font-family: 'Bebas Neue', sans-serif; font-size: 48px; letter-spacing: 4px; color: var(--text); }
+  .splash-sub { font-size: 13px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+  .splash-bar { width: 160px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 10px; }
+  .splash-progress { height: 100%; background: var(--accent); border-radius: 2px; animation: splashLoad 1.4s ease-out forwards; }
+  @keyframes splashLoad { from{width:0%} to{width:100%} }
+
+  /* ── TOP NAV BAR ── */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .topbar::after {
+    content: '';
+    position: absolute; bottom: -1px; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(232,255,71,0.3), transparent);
+  }
+  .topbar-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; color: var(--text); }
+  .topbar-title span { color: var(--accent); }
+  .topbar-week {
+    background: rgba(232,255,71,0.1); border: 1px solid rgba(232,255,71,0.3);
+    color: var(--accent); font-size: 11px; font-weight: 600;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 4px 12px; border-radius: 20px;
+  }
+
+  /* ── WEEK TABS ── */
+  .week-tabs {
+    display: flex; background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0; overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .week-tabs::-webkit-scrollbar { display: none; }
+  .week-tab {
+    flex: 1; min-width: 70px;
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+    letter-spacing: 1px; text-transform: uppercase;
+    color: var(--muted); background: none; border: none;
+    padding: 11px 8px; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s; white-space: nowrap;
+    position: relative;
+  }
+  .week-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── SCROLLABLE CONTENT ── */
+  .scroll-area {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 16px 24px;
+  }
+  .scroll-area::-webkit-scrollbar { display: none; }
+
+  /* ── PROGRESS CARD ── */
+  .progress-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .ring-wrap { flex-shrink: 0; }
+  .ring-svg { transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: var(--border); stroke-width: 5; }
+  .ring-fg {
+    fill: none; stroke: var(--accent); stroke-width: 5;
+    stroke-linecap: round; stroke-dasharray: 163;
+    stroke-dashoffset: 163;
+    transition: stroke-dashoffset 0.7s cubic-bezier(0.4,0,0.2,1);
+  }
+  .ring-center { font-family: 'Bebas Neue',sans-serif; font-size: 22px; color: var(--accent); text-align: center; }
+  .ring-lbl { font-size: 9px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; text-align: center; }
+  .prog-stats { flex: 1; }
+  .prog-stat { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .prog-stat:last-child { border-bottom: none; }
+  .prog-stat span:last-child { color: var(--accent); font-weight: 600; }
+
+  /* ── TIP CARD ── */
+  .tip-card {
+    background: linear-gradient(135deg, rgba(232,255,71,0.07), rgba(255,107,53,0.05));
+    border: 1px solid rgba(232,255,71,0.2);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    font-size: 13px; color: var(--muted); line-height: 1.5;
+  }
+  .tip-card strong { color: var(--accent); font-family: 'Bebas Neue',sans-serif; font-size: 14px; letter-spacing: 1px; display: block; margin-bottom: 5px; }
+
+  /* ── DAY CARDS ── */
+  .day-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .day-card.active-card { border-color: rgba(232,255,71,0.35); }
+  .day-card.rest-day { opacity: 0.55; }
+  .day-card.completed { border-color: rgba(232,255,71,0.4); }
+
+  .day-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 18px; cursor: pointer; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s;
+    border-radius: 16px;
+  }
+  .day-header:active { background: rgba(255,255,255,0.03); }
+
+  .day-num {
+    font-family: 'Bebas Neue', sans-serif; font-size: 32px;
+    line-height: 1; color: var(--border); min-width: 30px;
+  }
+  .day-card.active-card .day-num { color: var(--accent); }
+  .day-card.completed .day-num { color: var(--accent); }
+
+  .day-meta { flex: 1; }
+  .day-meta h2 { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 1px; }
+  .day-meta p { font-size: 10px; color: var(--muted); margin-top: 1px; text-transform: uppercase; letter-spacing: 0.8px; }
+
+  .day-right { display: flex; align-items: center; gap: 8px; }
+  .done-pill {
+    font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--accent); background: rgba(232,255,71,0.1);
+    border: 1px solid rgba(232,255,71,0.3);
+    padding: 3px 9px; border-radius: 20px; display: none;
+  }
+  .day-card.completed .done-pill { display: block; }
+  .chevron { color: var(--muted); font-size: 14px; transition: transform 0.25s; }
+  .day-card.open .chevron { transform: rotate(180deg); }
+
+  /* ── EXERCISE LIST ── */
+  .ex-list {
+    display: none;
+    padding: 0 14px 14px;
+    border-top: 1px solid var(--border);
+    animation: slideDown 0.25s ease;
+  }
+  @keyframes slideDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+  .day-card.open .ex-list { display: block; }
+
+  .ex-item {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 13px 15px;
+    margin-top: 8px; cursor: pointer;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .ex-item:active { transform: scale(0.98); }
+  .ex-item.done { border-color: rgba(232,255,71,0.45); background: rgba(232,255,71,0.05); }
+
+  .ex-check {
+    width: 24px; height: 24px;
+    border: 2px solid var(--border); border-radius: 6px;
+    flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 13px;
+    transition: all 0.2s;
+  }
+  .ex-item.done .ex-check { background: var(--accent); border-color: var(--accent); color: #000; }
+
+  .ex-body { flex: 1; min-width: 0; }
+  .ex-name { font-size: 14px; font-weight: 500; color: var(--text); }
+  .ex-detail { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+  .ex-sets {
+    font-family: 'Bebas Neue', sans-serif; font-size: 20px;
+    color: var(--muted); letter-spacing: 0.5px; flex-shrink: 0;
+  }
+  .ex-item.done .ex-sets { color: var(--accent); }
+
+  /* ── COMPLETE BUTTON ── */
+  .complete-btn {
+    width: 100%; margin-top: 12px;
+    background: var(--accent); color: #000; border: none;
+    font-family: 'Bebas Neue', sans-serif; font-size: 17px;
+    letter-spacing: 2px; padding: 15px;
+    border-radius: 12px; cursor: pointer;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .complete-btn:active { transform: scale(0.97); background: #d4e840; }
+  .complete-btn:disabled { background: var(--border); color: var(--muted); }
+
+  /* ── BOTTOM NAV ── */
+  .bottom-nav {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-shrink: 0;
+    padding-bottom: var(--safe-bottom);
+  }
+  .nav-btn {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; gap: 3px;
+    padding: 10px 8px;
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); transition: color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .nav-btn.active { color: var(--accent); }
+  .nav-btn .nav-icon { font-size: 22px; }
+  .nav-btn .nav-label { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: calc(80px + var(--safe-bottom));
+    left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--accent); color: #000;
+    font-family: 'Bebas Neue', sans-serif; font-size: 14px;
+    letter-spacing: 1.5px; padding: 10px 24px; border-radius: 20px;
+    opacity: 0; transition: all 0.3s; pointer-events: none;
+    white-space: nowrap; z-index: 100;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── INSTALL BANNER ── */
+  #installBanner {
+    background: linear-gradient(135deg, rgba(232,255,71,0.12), rgba(255,107,53,0.08));
+    border: 1px solid rgba(232,255,71,0.3);
+    border-radius: 14px; margin: 0 16px 14px;
+    padding: 14px 16px;
+    display: none; flex-shrink: 0;
+  }
+  #installBanner.show { display: block; }
+  .install-title { font-family: 'Bebas Neue',sans-serif; font-size: 16px; letter-spacing: 1px; color: var(--accent); margin-bottom: 6px; }
+  .install-steps { font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .install-steps b { color: var(--text); }
+  .install-close {
+    float: right; background: none; border: none; color: var(--muted);
+    font-size: 18px; cursor: pointer; margin-top: -2px;
+  }
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <div class="splash-icon">💪</div>
+  <div class="splash-title">STRENGTH</div>
+  <div class="splash-sub">Builder · 4 Week Program</div>
+  <div class="splash-bar"><div class="splash-progress"></div></div>
+</div>
+
+<div id="app">
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="topbar-title">STRENGTH <span>BUILDER</span></div>
+    <div class="topbar-week" id="topbarWeek">WEEK 1</div>
+  </div>
+
+  <!-- Week Tabs -->
+  <div class="week-tabs">
+    <button class="week-tab active" onclick="showWeek(1,this)">Week 1</button>
+    <button class="week-tab" onclick="showWeek(2,this)">Week 2</button>
+    <button class="week-tab" onclick="showWeek(3,this)">Week 3</button>
+    <button class="week-tab" onclick="showWeek(4,this)">Week 4</button>
+  </div>
+
+  <!-- Install Banner -->
+  <div id="installBanner">
+    <button class="install-close" onclick="document.getElementById('installBanner').classList.remove('show')">✕</button>
+    <div class="install-title">📲 Add to Home Screen</div>
+    <div class="install-steps">
+      1. Tap the <b>Share</b> button (□↑) in Safari<br>
+      2. Scroll down and tap <b>"Add to Home Screen"</b><br>
+      3. Tap <b>Add</b> — enjoy the app! 🎉
+    </div>
+  </div>
+
+  <!-- Scrollable Content -->
+  <div class="scroll-area" id="scrollArea">
+    <!-- Progress Card -->
+    <div class="progress-card">
+      <div class="ring-wrap">
+        <svg width="58" height="58" class="ring-svg" viewBox="0 0 58 58">
+          <circle class="ring-bg" cx="29" cy="29" r="26"/>
+          <circle class="ring-fg" id="progressRing" cx="29" cy="29" r="26"/>
+        </svg>
+        <div class="ring-center" id="progressLabel">0%</div>
+        <div class="ring-lbl">Done</div>
+      </div>
+      <div class="prog-stats">
+        <div class="prog-stat"><span>Days Done</span><span id="daysDone">0 / 3</span></div>
+        <div class="prog-stat"><span>Exercises</span><span id="exDone">0 done</span></div>
+        <div class="prog-stat"><span>Program</span><span id="currentWeekLabel">Week 1 of 4</span></div>
+      </div>
+    </div>
+
+    <!-- Tip Card -->
+    <div class="tip-card">
+      <strong id="tipLabel">💡 WEEK 1 TIP</strong>
+      <span id="tipText">Focus on form first — controlled movement beats rushed reps every time. Rest 60–90 sec between sets.</span>
+    </div>
+
+    <!-- Day Cards -->
+    <div id="daysContainer"></div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <button class="nav-btn active" onclick="switchTab('workout',this)">
+      <span class="nav-icon">🏋️</span>
+      <span class="nav-label">Workout</span>
+    </button>
+    <button class="nav-btn" onclick="switchTab('progress',this)">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Progress</span>
+    </button>
+    <button class="nav-btn" onclick="switchTab('tips',this)">
+      <span class="nav-icon">💡</span>
+      <span class="nav-label">Tips</span>
+    </button>
+    <button class="nav-btn" onclick="showInstall()">
+      <span class="nav-icon">📲</span>
+      <span class="nav-label">Install</span>
+    </button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── DATA ───────────────────────────────────────────────────────────────
+const tips = [
+  "Focus on form first — controlled movement beats rushed reps every time. Rest 60–90 sec between sets.",
+  "Slow the eccentric (lowering) phase to 3 seconds. This builds more muscle with the same reps.",
+  "Push closer to failure. If you stop at 12 reps and could do 15, you're leaving gains on the table.",
+  "Test your max reps on push-ups and squats today! You'll be surprised how far you've come."
+];
+
+const weekTemplate = {
+  days: [
+    {
+      name:"UPPER BODY", focus:"Chest · Shoulders · Triceps",
+      exercises:[
+        {name:"Push-Ups",            sets:"3", reps:"8–12 reps",  tip:"Body straight, elbows at 45°"},
+        {name:"Wide Push-Ups",       sets:"3", reps:"6–10 reps",  tip:"Hands wider than shoulders"},
+        {name:"Pike Push-Ups",       sets:"3", reps:"6–10 reps",  tip:"Hips high, targets shoulders"},
+        {name:"Tricep Dips (chair)", sets:"3", reps:"8–12 reps",  tip:"Fingers forward, elbows to 90°"},
+        {name:"Diamond Push-Ups",    sets:"2", reps:"5–8 reps",   tip:"Hands form a diamond shape"},
+      ]
+    },
+    {
+      name:"LOWER BODY", focus:"Quads · Glutes · Hamstrings",
+      exercises:[
+        {name:"Bodyweight Squats",   sets:"3", reps:"12–15 reps", tip:"Knees track over toes"},
+        {name:"Reverse Lunges",      sets:"3", reps:"10 each leg",tip:"Both knees at 90°"},
+        {name:"Glute Bridges",       sets:"3", reps:"15 reps",    tip:"Squeeze glutes at the top"},
+        {name:"Wall Sit",            sets:"3", reps:"30 seconds", tip:"Thighs parallel to floor"},
+        {name:"Calf Raises",         sets:"3", reps:"20 reps",    tip:"Full range — heel to tiptoe"},
+      ]
+    },
+    {name:"ACTIVE REST", focus:"Mobility · Recovery", rest:true, exercises:[]},
+    {
+      name:"CORE & FULL BODY", focus:"Core · Back · Full Body",
+      exercises:[
+        {name:"Plank",               sets:"3", reps:"30–45 sec",  tip:"Brace core, body flat"},
+        {name:"Superman Hold",       sets:"3", reps:"10 × 2 sec", tip:"Lift arms & legs together"},
+        {name:"Mountain Climbers",   sets:"3", reps:"20 (10 ea)", tip:"Drive knees to chest"},
+        {name:"Hollow Body Hold",    sets:"3", reps:"20 seconds", tip:"Lower back pressed flat"},
+        {name:"Burpees",             sets:"2", reps:"6–8 reps",   tip:"Stand → plank → jump up"},
+      ]
+    },
+    {name:"ACTIVE REST", focus:"Walk · Stretch", rest:true, exercises:[]},
+    {name:"REST", focus:"Full Rest Day", rest:true, exercises:[]},
+    {name:"REST", focus:"Full Rest Day", rest:true, exercises:[]},
+  ]
+};
+
+const weeks = Array.from({length:4}, () => JSON.parse(JSON.stringify(weekTemplate)));
+
+// ── STATE (persisted to localStorage) ─────────────────────────────────
+let currentWeek = 1;
+let state = {};
+const openDays = new Set();
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem('strengthBuilderState');
+    if(saved) {
+      const parsed = JSON.parse(saved);
+      currentWeek = parsed.currentWeek || 1;
+      // Restore sets
+      if(parsed.state) {
+        Object.keys(parsed.state).forEach(w => {
+          state[w] = {};
+          Object.keys(parsed.state[w]).forEach(d => {
+            state[w][d] = new Set(parsed.state[w][d]);
+          });
+        });
+      }
+    }
+  } catch(e) {}
+}
+
+function saveState() {
+  try {
+    const serialized = {};
+    Object.keys(state).forEach(w => {
+      serialized[w] = {};
+      Object.keys(state[w]).forEach(d => {
+        serialized[w][d] = [...state[w][d]];
+      });
+    });
+    localStorage.setItem('strengthBuilderState', JSON.stringify({currentWeek, state: serialized}));
+  } catch(e) {}
+}
+
+function getState(w, d) {
+  if(!state[w]) state[w] = {};
+  if(!state[w][d]) state[w][d] = new Set();
+  return state[w][d];
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────
+function showWeek(w, btn) {
+  currentWeek = w;
+  document.querySelectorAll('.week-tab').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  document.getElementById('topbarWeek').textContent = 'WEEK ' + w;
+  document.getElementById('currentWeekLabel').textContent = `Week ${w} of 4`;
+  document.getElementById('tipLabel').textContent = `💡 WEEK ${w} TIP`;
+  document.getElementById('tipText').textContent = tips[w-1];
+  openDays.clear();
+  renderDays();
+  updateProgress();
+  saveState();
+}
+
+function renderDays() {
+  const container = document.getElementById('daysContainer');
+  const weekData = weeks[currentWeek-1];
+  container.innerHTML = '';
+  const dayNames = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+
+  weekData.days.forEach((day, di) => {
+    const st = getState(currentWeek, di);
+    const isRest = !!day.rest;
+    const doneAll = !isRest && day.exercises.length > 0 && st.size === day.exercises.length;
+
+    const card = document.createElement('div');
+    card.className = `day-card${isRest?' rest-day':''}${doneAll?' completed':''}${openDays.has(di)?' open active-card':''}`;
+    card.dataset.day = di;
+
+    const exHTML = day.exercises.map((ex, ei) => `
+      <div class="ex-item${st.has(ei)?' done':''}" onclick="toggleEx(${di},${ei})">
+        <div class="ex-check">${st.has(ei)?'✓':''}</div>
+        <div class="ex-body">
+          <div class="ex-name">${ex.name}</div>
+          <div class="ex-detail">${ex.sets} sets · ${ex.reps} &nbsp;·&nbsp; ${ex.tip}</div>
+        </div>
+        <div class="ex-sets">${ex.sets}×</div>
+      </div>`).join('');
+
+    card.innerHTML = `
+      <div class="day-header" onclick="toggleDay(${di})">
+        <div class="day-num">${String(di+1).padStart(2,'0')}</div>
+        <div class="day-meta">
+          <h2>${day.name}</h2>
+          <p>${dayNames[di]} · ${day.focus}</p>
+        </div>
+        <div class="day-right">
+          <span class="done-pill">Done ✓</span>
+          ${!isRest?'<span class="chevron">▾</span>':''}
+        </div>
+      </div>
+      ${!isRest && day.exercises.length > 0 ? `
+        <div class="ex-list">
+          ${exHTML}
+          <button class="complete-btn" onclick="completeDay(${di})" ${doneAll?'disabled':''}>
+            ${doneAll?'✓ SESSION COMPLETE':'MARK ALL COMPLETE'}
+          </button>
+        </div>` : ''}
+    `;
+
+    container.appendChild(card);
+  });
+}
+
+function toggleDay(di) {
+  const card = document.querySelector(`[data-day="${di}"]`);
+  if(!card || card.classList.contains('rest-day')) return;
+  const isOpen = card.classList.contains('open');
+  card.classList.toggle('open', !isOpen);
+  card.classList.toggle('active-card', !isOpen);
+  if(!isOpen) openDays.add(di); else openDays.delete(di);
+}
+
+function toggleEx(di, ei) {
+  const st = getState(currentWeek, di);
+  if(st.has(ei)) st.delete(ei); else { st.add(ei); showToast('Exercise done! 💪'); }
+  renderDays(); updateProgress(); saveState();
+}
+
+function completeDay(di) {
+  const day = weeks[currentWeek-1].days[di];
+  const st = getState(currentWeek, di);
+  day.exercises.forEach((_,i) => st.add(i));
+  openDays.add(di);
+  renderDays(); updateProgress(); saveState();
+  showToast('Session complete! 🔥');
+}
+
+function updateProgress() {
+  const weekData = weeks[currentWeek-1];
+  const workDays = weekData.days.filter(d => !d.rest && d.exercises.length > 0);
+  let doneD = 0, doneEx = 0;
+  workDays.forEach(day => {
+    const idx = weekData.days.indexOf(day);
+    const st = getState(currentWeek, idx);
+    if(st.size === day.exercises.length) doneD++;
+    doneEx += st.size;
+  });
+  const pct = Math.round(doneD / workDays.length * 100);
+  const circ = 163;
+  document.getElementById('progressRing').style.strokeDashoffset = circ - (pct/100)*circ;
+  document.getElementById('progressLabel').textContent = pct+'%';
+  document.getElementById('daysDone').textContent = `${doneD} / ${workDays.length}`;
+  document.getElementById('exDone').textContent = `${doneEx} done`;
+}
+
+// ── TOAST ──────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ── BOTTOM NAV ─────────────────────────────────────────────────────────
+function switchTab(tab, btn) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if(tab === 'progress') showToast('Track progress by checking off exercises!');
+  if(tab === 'tips') {
+    document.getElementById('scrollArea').scrollTo({top: 0, behavior: 'smooth'});
+    showToast('💡 Tip: ' + tips[currentWeek-1].substring(0,40) + '…');
+  }
+}
+
+function showInstall() {
+  document.getElementById('installBanner').classList.add('show');
+  document.getElementById('scrollArea').scrollTo({top: 0, behavior: 'smooth'});
+}
+
+// ── SPLASH + INIT ──────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  loadState();
+
+  // Restore correct week tab
+  document.querySelectorAll('.week-tab')[currentWeek-1].classList.add('active');
+  document.querySelectorAll('.week-tab').forEach((b,i) => {
+    if(i !== currentWeek-1) b.classList.remove('active');
+  });
+
+  renderDays(); updateProgress();
+  document.getElementById('topbarWeek').textContent = 'WEEK ' + currentWeek;
+  document.getElementById('currentWeekLabel').textContent = `Week ${currentWeek} of 4`;
+  document.getElementById('tipLabel').textContent = `💡 WEEK ${currentWeek} TIP`;
+  document.getElementById('tipText').textContent = tips[currentWeek-1];
+
+  // Show install hint if in browser (not standalone)
+  const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+  if(!isStandalone && /iphone|ipad|ipod/i.test(navigator.userAgent)) {
+    setTimeout(() => document.getElementById('installBanner').classList.add('show'), 2500);
+  }
+
+  // Dismiss splash
+  setTimeout(() => {
+    document.getElementById('splash').classList.add('hide');
+    setTimeout(() => document.getElementById('splash').remove(), 700);
+  }, 1600);
+});
+
+// Prevent iOS bounce scroll on body
+document.addEventListener('touchmove', e => {
+  if(!e.target.closest('.scroll-area')) e.preventDefault();
+}, {passive: false});
+</script>
+</body>
+</html>
